@@ -108,7 +108,7 @@ workflow PREPARE_GENOME {
 
     if (make_bed) {
         ch_gtf_with_meta = ch_gtf.map { file -> [ [id: file.simpleName], file ] }
-        ch_gene_bed = BEDOPS_GTF2BED(ch_gtf_with_meta).bed
+        ch_gene_bed = BEDOPS_GTF2BED(ch_gtf_with_meta).bed.map { it[1] }
         ch_versions = ch_versions.mix(BEDOPS_GTF2BED.out.versions)
     } else {
         if (params.gene_bed.endsWith('.gz')) {
@@ -207,8 +207,9 @@ workflow PREPARE_GENOME {
     //
     ch_binned_genome = Channel.empty()
 
+
     BEDTOOLS_MAKEWINDOWS (
-        ch_genome_filtered_bed.map { bed -> [ [id: bed.simpleName], bed ] }
+        ch_genome_filtered_bed.map { bed -> tuple([id: bed.simpleName], bed) }
     )
     ch_versions = ch_versions.mix(BEDTOOLS_MAKEWINDOWS.out.versions)
 
@@ -220,7 +221,12 @@ workflow PREPARE_GENOME {
         ch_chrom_sizes
     )
 
+
     ch_binned_genome = BIN_BY_CHROMOSOME.out.chrom_beds
+        .flatMap { meta, bedfiles ->
+            def chrom_id = (meta instanceof Map && meta.containsKey('id')) ? meta.id : meta
+            return bedfiles.collect { bedfile -> [chrom_id.toString(), file(bedfile)] }
+    }
 
     emit:
     fasta         = ch_fasta                  //    path: genome.fasta
@@ -232,6 +238,6 @@ workflow PREPARE_GENOME {
     bwa_index     = ch_bwa_index              //    path: bwa/index/
     bowtie2_index = ch_bowtie2_index          //    path: bowtie2/index/
     blacklist     = ch_blacklist
-    binned_genome = ch_binned_genome
+    binned_genome = ch_binned_genome          //    tuple: [ val(chrom_id), path(bed_file) ]
     versions      = ch_versions.ifEmpty(null) // channel: [ versions.yml ]
 }
