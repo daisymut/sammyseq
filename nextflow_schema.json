@@ -413,5 +413,11 @@
         {
             "$ref": "#/$defs/generic_options"
         }
-    ]
+    ],
+    "properties": {
+        "trimmer": {
+            "type": "string",
+            "default": "trimmomatic"
+        }
+    }
 }
